@@ -348,6 +348,7 @@ const clivalue_t valueTable[] = {
     { "frsky_coordinates_format",   VAR_UINT8  | MASTER_VALUE,  &masterConfig.telemetryConfig.frsky_coordinate_format, 0, FRSKY_FORMAT_NMEA },
     { "frsky_unit",                 VAR_UINT8  | MASTER_VALUE,  &masterConfig.telemetryConfig.frsky_unit, 0, FRSKY_UNIT_IMPERIALS },
     { "frsky_vfas_precision",       VAR_UINT8  | MASTER_VALUE,  &masterConfig.telemetryConfig.frsky_vfas_precision, FRSKY_VFAS_PRECISION_LOW, FRSKY_VFAS_PRECISION_HIGH },
+    { "hott_alarm_sound_interval",  VAR_UINT8  | MASTER_VALUE,  &masterConfig.telemetryConfig.hottAlarmSoundInterval, 0, 120 },
 
     { "battery_capacity",           VAR_UINT16 | MASTER_VALUE,  &masterConfig.batteryConfig.batteryCapacity, 0, 20000 },
     { "vbat_scale",                 VAR_UINT8  | MASTER_VALUE,  &masterConfig.batteryConfig.vbatscale, VBAT_SCALE_MIN, VBAT_SCALE_MAX },
@@ -384,12 +385,12 @@ const clivalue_t valueTable[] = {
 
     { "yaw_control_direction",      VAR_INT8   | MASTER_VALUE,  &masterConfig.yaw_control_direction, -1, 1 },
 
-    { "pid_at_min_throttle",        VAR_UINT8  | MASTER_VALUE,  &masterConfig.mixerConfig.pid_at_min_throttle, 0, 1 },
-    { "yaw_direction",              VAR_INT8   | PROFILE_VALUE, &masterConfig.mixerConfig.yaw_direction, -1, 1 },
+    { "pid_at_min_throttle",        VAR_UINT8  | MASTER_VALUE, &masterConfig.mixerConfig.pid_at_min_throttle, 0, 1 },
+    { "yaw_direction",              VAR_INT8   | MASTER_VALUE, &masterConfig.mixerConfig.yaw_direction, -1, 1 },
 #ifdef USE_SERVOS
-    { "tri_unarmed_servo",          VAR_INT8   | PROFILE_VALUE, &masterConfig.mixerConfig.tri_unarmed_servo, 0, 1 },
-    { "servo_lowpass_freq",         VAR_INT16  | PROFILE_VALUE, &masterConfig.mixerConfig.servo_lowpass_freq, 10, 400},
-    { "servo_lowpass_enable",       VAR_INT8   | PROFILE_VALUE, &masterConfig.mixerConfig.servo_lowpass_enable, 0, 1 },
+    { "tri_unarmed_servo",          VAR_INT8   | MASTER_VALUE, &masterConfig.mixerConfig.tri_unarmed_servo, 0, 1 },
+    { "servo_lowpass_freq",         VAR_INT16  | MASTER_VALUE, &masterConfig.mixerConfig.servo_lowpass_freq, 10, 400},
+    { "servo_lowpass_enable",       VAR_INT8   | MASTER_VALUE, &masterConfig.mixerConfig.servo_lowpass_enable, 0, 1 },
 #endif
 
     { "default_rate_profile",       VAR_UINT8  | PROFILE_VALUE , &masterConfig.profile[0].defaultRateProfileIndex, 0, MAX_CONTROL_RATE_PROFILE_COUNT - 1 },
@@ -397,10 +398,10 @@ const clivalue_t valueTable[] = {
     { "rc_expo",                    VAR_UINT8  | CONTROL_RATE_VALUE, &masterConfig.controlRateProfiles[0].rcExpo8, 0, 100 },
     { "thr_mid",                    VAR_UINT8  | CONTROL_RATE_VALUE, &masterConfig.controlRateProfiles[0].thrMid8, 0, 100 },
     { "thr_expo",                   VAR_UINT8  | CONTROL_RATE_VALUE, &masterConfig.controlRateProfiles[0].thrExpo8, 0, 100 },
-    { "roll_rate",                  VAR_UINT8  | CONTROL_RATE_VALUE, &masterConfig.controlRateProfiles[0].rates[FD_ROLL], 0, 100 },
-    { "pitch_rate",                 VAR_UINT8  | CONTROL_RATE_VALUE, &masterConfig.controlRateProfiles[0].rates[FD_PITCH], 0, 100 },
-    { "yaw_rate",                   VAR_UINT8  | CONTROL_RATE_VALUE, &masterConfig.controlRateProfiles[0].rates[FD_YAW], 0, 100 },
-    { "tpa_rate",                   VAR_UINT8  | CONTROL_RATE_VALUE, &masterConfig.controlRateProfiles[0].dynThrPID, 0, 100},
+    { "roll_rate",                  VAR_UINT8  | CONTROL_RATE_VALUE, &masterConfig.controlRateProfiles[0].rates[FD_ROLL], 0, CONTROL_RATE_CONFIG_ROLL_PITCH_RATE_MAX },
+    { "pitch_rate",                 VAR_UINT8  | CONTROL_RATE_VALUE, &masterConfig.controlRateProfiles[0].rates[FD_PITCH], 0, CONTROL_RATE_CONFIG_ROLL_PITCH_RATE_MAX },
+    { "yaw_rate",                   VAR_UINT8  | CONTROL_RATE_VALUE, &masterConfig.controlRateProfiles[0].rates[FD_YAW], 0, CONTROL_RATE_CONFIG_YAW_RATE_MAX },
+    { "tpa_rate",                   VAR_UINT8  | CONTROL_RATE_VALUE, &masterConfig.controlRateProfiles[0].dynThrPID, 0, CONTROL_RATE_CONFIG_TPA_MAX},
     { "tpa_breakpoint",             VAR_UINT16 | CONTROL_RATE_VALUE, &masterConfig.controlRateProfiles[0].tpa_breakpoint, PWM_RANGE_MIN, PWM_RANGE_MAX},
 
     { "failsafe_delay",             VAR_UINT8  | PROFILE_VALUE, &masterConfig.profile[0].failsafeConfig.failsafe_delay, 0, 200 },
@@ -1611,7 +1612,7 @@ static void cliVersion(char *cmdline)
     );
 }
 
-void cliProcess()
+void cliProcess(void)
 {
     if (!cliPort) {
         return;
@@ -1667,6 +1668,12 @@ void cliProcess()
             clicmd_t *cmd = NULL;
             clicmd_t target;
             cliPrint("\r\n");
+
+            // Strip trailing whitespace
+            while (bufferIndex > 0 && cliBuffer[bufferIndex - 1] == ' ') {
+                bufferIndex--;
+            }
+
             cliBuffer[bufferIndex] = 0; // null terminate
 
             if (cliBuffer[0] != '#') {
@@ -1695,8 +1702,8 @@ void cliProcess()
                 cliPrint("\010 \010");
             }
         } else if (bufferIndex < sizeof(cliBuffer) && c >= 32 && c <= 126) {
-            if (!bufferIndex && c == 32)
-                continue;
+            if (!bufferIndex && c == ' ')
+                continue; // Ignore leading spaces
             cliBuffer[bufferIndex++] = c;
             cliWrite(c);
         }

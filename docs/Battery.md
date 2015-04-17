@@ -47,7 +47,7 @@ Enable the `VBAT` feature.
 
 Configure min/max cell voltages using the following CLI setting:
 
-`vbat_scale` - adjust this to match battery voltage to reported value.
+`vbat_scale` - adjust this to match battery voltage to the value on tab "setup".
 
 `vbat_max_cell_voltage` - maximum voltage per cell, used for auto-detecting battery voltage in 0.1V units, i.e. 43 = 4.3V
 
